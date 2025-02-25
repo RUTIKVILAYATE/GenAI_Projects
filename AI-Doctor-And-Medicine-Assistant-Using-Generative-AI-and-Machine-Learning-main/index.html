@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Doctor and Medicine Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<style>
+    /* General Styles */
+    body {
+        font-family: 'Roboto', sans-serif;
+        background-color: #eaf4f9;
+        color: #333;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+
+    .container {
+        background-color: #ffffff;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.1);
+        max-width: 500px;
+        text-align: center;
+    }
+
+    h1 {
+        font-size: 2.2rem;
+        color: #0070A1;
+        margin-bottom: 20px;
+    }
+
+    .mic-wrapper {
+        margin: 20px 0;
+    }
+
+    /* Microphone Button */
+    .mic-btn {
+        background-color: #0070A1;
+        color: #ffffff;
+        font-size: 2rem;
+        padding: 15px 20px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        transition: background-color 0.3s;
+    }
+
+    .mic-btn:hover {
+        background-color: #005f89;
+    }
+
+    .mic-btn:active {
+        background-color: #004e6b;
+    }
+
+    #response-text {
+        margin-top: 20px;
+        font-size: 1.1rem;
+        color: #0070A1;
+        font-weight: bold;
+    }
+
+    /* Conversation History Section */
+    #conversation-history {
+        margin-top: 20px;
+        max-height: 300px;
+        overflow-y: auto;
+        border-top: 2px solid #0070A1;
+        padding-top: 10px;
+    }
+
+    .history-entry {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        margin-bottom: 15px;
+        padding: 10px;
+        border-radius: 8px;
+        background-color: #f1f9ff;
+        box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .user-input {
+        font-weight: bold;
+        color: #005f89;
+    }
+
+    .ai-response {
+        color: #333;
+        margin-top: 5px;
+    }
+</style>
+
+<body>
+    <div class="container">
+        <h1>AI Doctor and Medicine Assistant</h1>
+
+        <div class="mic-wrapper">
+            <button id="start-record-btn" class="mic-btn">🎤</button>
+            <p>Tap to Speak</p>
+        </div>
+
+        <div id="response-text">Awaiting your input...</div>
+
+        <div id="conversation-history">
+            <!-- Conversation history will be dynamically updated here -->
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+
+<script>
+    const startRecordBtn = document.getElementById('start-record-btn');
+    const responseText = document.getElementById('response-text');
+    const conversationHistory = document.getElementById('conversation-history');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
+    recognition.onstart = function() {
+        responseText.innerHTML = 'Listening...';
+    };
+
+    recognition.onspeechend = function() {
+        recognition.stop();
+    };
+
+    recognition.onresult = function(event) {
+        const userInput = event.results[0][0].transcript;
+        responseText.innerHTML = `You said: "${userInput}"`;
+
+        // Send user input to Flask server
+        fetch('/process_voice', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ user_input: userInput }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            const aiResponse = data.response;
+            responseText.innerHTML = `AI Response: "${aiResponse}"`;
+
+            // Update conversation history with both user input and AI response
+            updateConversationHistory(data.conversation_history);
+
+            speakResponse(aiResponse);
+        })
+        .catch(error => {
+            responseText.innerHTML = 'Error processing request.';
+        });
+    };
+
+    startRecordBtn.addEventListener('click', () => {
+        recognition.start();
+    });
+
+    // Update the conversation history section
+    function updateConversationHistory(history) {
+        conversationHistory.innerHTML = '';  // Clear existing history
+
+        history.forEach(entry => {
+            const historyEntry = document.createElement('div');
+            historyEntry.classList.add('history-entry');
+
+            const userInput = document.createElement('div');
+            userInput.classList.add('user-input');
+            userInput.innerHTML = `You: ${entry.user}`;
+
+            const aiResponse = document.createElement('div');
+            aiResponse.classList.add('ai-response');
+            aiResponse.innerHTML = `AI: ${entry.ai}`;
+
+            historyEntry.appendChild(userInput);
+            historyEntry.appendChild(aiResponse);
+
+            conversationHistory.appendChild(historyEntry);
+        });
+    }
+
+    // Use the SpeechSynthesis API to speak the AI response
+    function speakResponse(text) {
+        const synth = window.speechSynthesis;
+        const utterance = new SpeechSynthesisUtterance(text);
+        synth.speak(utterance);
+    }
+</script>
+</html>
